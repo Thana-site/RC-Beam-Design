@@ -1,42 +1,48 @@
 """
-Material Properties Module
-ACI 318 material parameters and conversions
+Material Configuration Module
+Handles material properties and ACI 318 code parameters
 """
 
 import numpy as np
 
 
-class MaterialProperties:
-    """ACI 318 material constants and properties"""
+class MaterialConfig:
+    """Material properties and ACI 318 constants"""
     
-    # Default material strengths (ksc = kg/cm²)
-    DEFAULT_FC = 280.0
-    DEFAULT_FY_MAIN = 4200.0
-    DEFAULT_FY_STIRRUP = 2800.0
+    # Default material properties (ksc units)
+    DEFAULT_FC = 280.0  # Concrete strength (ksc)
+    DEFAULT_FY_MAIN = 4200.0  # Main steel grade (ksc)
+    DEFAULT_FY_STIRRUP = 2800.0  # Stirrup steel grade (ksc)
     
-    # Elastic modulus
-    ES = 2.04e6  # ksc (Steel)
+    # Steel modulus of elasticity
+    ES = 2.04e6  # ksc (200 GPa)
     
     # ACI 318 strain limits
-    EPSILON_C_MAX = 0.003  # Ultimate concrete strain
-    EPSILON_TY = 0.002     # Yield strain
-    EPSILON_T_TENSION = 0.005  # Tension-controlled limit
+    EPSILON_C = 0.003  # Ultimate concrete strain
+    EPSILON_TY = 0.002  # Yield strain transition
+    EPSILON_T_LIMIT = 0.005  # Tension-controlled limit
     
-    # Standard bar sizes
-    BAR_DIAMETERS = [10, 12, 16, 20, 25, 28, 32]  # mm
-    STIRRUP_DIAMETERS = [8, 10, 12]  # mm
+    # Standard bar diameters (mm)
+    BAR_SIZES = [10, 12, 16, 20, 25, 28, 32]
+    
+    # Stirrup sizes (mm)
+    STIRRUP_SIZES = [8, 10, 12]
 
 
 def calculate_beta1(fc_ksc):
     """
-    Calculate β₁ factor per ACI 318-19
+    Calculate β₁ factor based on concrete strength per ACI 318
     
-    Args:
-        fc_ksc: Concrete strength in ksc
-        
+    Parameters:
+    -----------
+    fc_ksc : float
+        Concrete compressive strength in ksc (kg/cm²)
+    
     Returns:
-        float: β₁ factor
+    --------
+    float : β₁ factor
     """
+    # Convert ksc to MPa (1 ksc = 0.0980665 MPa)
     fc_mpa = fc_ksc * 0.0980665
     
     if fc_mpa <= 28:
@@ -44,47 +50,56 @@ def calculate_beta1(fc_ksc):
     elif fc_mpa >= 55:
         return 0.65
     else:
+        # Linear interpolation between 28 and 55 MPa
         return 0.85 - 0.05 * (fc_mpa - 28) / 7
 
 
-def calculate_phi_factor(epsilon_t):
+def calculate_phi_factor(epsilon_t, epsilon_ty=MaterialConfig.EPSILON_TY):
     """
-    Calculate strength reduction factor φ per ACI 318-19
+    Calculate strength reduction factor φ based on tension strain per ACI 318
     
-    Args:
-        epsilon_t: Tension steel strain
-        
+    Parameters:
+    -----------
+    epsilon_t : float
+        Tension steel strain
+    epsilon_ty : float
+        Yield strain (default 0.002)
+    
     Returns:
-        tuple: (phi_factor, control_mode_string)
+    --------
+    tuple : (phi_factor, control_type_string)
     """
-    epsilon_ty = MaterialProperties.EPSILON_TY
-    
     if epsilon_t >= 0.005:
         return 0.90, "Tension-Controlled ✓"
     elif epsilon_t <= epsilon_ty:
         return 0.65, "Compression-Controlled ⚠"
     else:
+        # Transition zone - linear interpolation
         phi = 0.65 + (epsilon_t - epsilon_ty) * (0.25 / (0.005 - epsilon_ty))
         return round(phi, 3), "Transition Zone ⚡"
 
 
 def get_bar_area(diameter_mm):
-    """Calculate bar area in mm²"""
+    """
+    Calculate area of a single reinforcement bar
+    
+    Parameters:
+    -----------
+    diameter_mm : float
+        Bar diameter in mm
+    
+    Returns:
+    --------
+    float : Bar area in mm²
+    """
     return np.pi * (diameter_mm ** 2) / 4
 
 
-def convert_units(value, from_unit, to_unit):
-    """Convert between common structural units"""
-    conversions = {
-        ('ksc', 'mpa'): 0.0980665,
-        ('mpa', 'ksc'): 10.197162,
-        ('tonf', 'n'): 9806.65,
-        ('n', 'tonf'): 0.000101972,
-        ('tonfm', 'nmm'): 9.80665e9,
-        ('nmm', 'tonfm'): 1.01972e-10
-    }
-    
-    key = (from_unit.lower(), to_unit.lower())
-    if key in conversions:
-        return value * conversions[key]
-    return value
+def convert_ksc_to_mpa(ksc):
+    """Convert ksc (kg/cm²) to MPa"""
+    return ksc * 0.0980665
+
+
+def convert_mpa_to_ksc(mpa):
+    """Convert MPa to ksc (kg/cm²)"""
+    return mpa / 0.0980665
