@@ -1,21 +1,22 @@
 """
-RC Beam Analysis Application Modules
-ACI 318 Compliant Structural Analysis
+RC Beam Analysis Sub-Functions
+Professional structural engineering tools for ACI 318 compliant design
 """
 
 __version__ = "2.0.0"
 __author__ = "Structural Engineering Team"
 
-from . import material_properties
-from . import analysis_engine
-from . import visualization
-from . import input_components
-from . import ui_components
+# Import all modules for easy access
+from . import material_config
+from . import analysis_core
+from . import diagram_plot
+from . import input_tables
+from . import ui_layout
 
 __all__ = [
-    'material_properties',
-    'analysis_engine',
-    'visualization',
-    'input_components',
-    'ui_components'
+    'material_config',
+    'analysis_core',
+    'diagram_plot',
+    'input_tables',
+    'ui_layout'
 ]
