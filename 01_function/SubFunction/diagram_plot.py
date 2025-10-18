@@ -1,6 +1,6 @@
 """
-Visualization Module
-All plotting functions using Plotly
+Diagram Plotting Module
+Handles all visualization functions using Plotly
 """
 
 import plotly.graph_objects as go
@@ -8,20 +8,27 @@ from plotly.subplots import make_subplots
 import numpy as np
 
 
-def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
+def plot_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
     """
-    Create unified figure with section and strain diagrams side-by-side
-    Both share the same vertical scale for visual alignment
+    Create combined plot showing beam section and strain diagram side by side
+    Both diagrams share the same vertical (height) scale for visual alignment
     
-    Args:
-        b_mm: Beam width (mm)
-        h_mm: Beam height (mm)
-        cover_mm: Cover (mm)
-        bar_data: List of bar dictionaries
-        strain_profile: Strain distribution data
-        
+    Parameters:
+    -----------
+    b_mm : float
+        Beam width in mm
+    h_mm : float
+        Beam height in mm
+    cover_mm : float
+        Concrete cover in mm
+    bar_data : list
+        List of dictionaries containing bar information
+    strain_profile : dict
+        Strain distribution data
+    
     Returns:
-        plotly Figure object
+    --------
+    plotly.graph_objects.Figure
     """
     
     fig = make_subplots(
@@ -31,11 +38,11 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
         specs=[[{"type": "xy"}, {"type": "xy"}]]
     )
     
-    # ==========================================
-    # LEFT: BEAM SECTION
-    # ==========================================
+    # ===========================
+    # SUBPLOT 1: BEAM SECTION
+    # ===========================
     
-    # Beam outline
+    # Draw beam outline
     fig.add_shape(
         type="rect",
         x0=0, y0=0, x1=b_mm, y1=h_mm,
@@ -44,8 +51,8 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
         row=1, col=1
     )
     
-    # Compression block shading
     if strain_profile:
+        # Draw compression block
         a_mm = strain_profile['a_mm']
         fig.add_shape(
             type="rect",
@@ -55,16 +62,16 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
             row=1, col=1
         )
         
-        # Neutral axis line
+        # Draw neutral axis line
         c_mm = strain_profile['c_mm']
         fig.add_shape(
             type="line",
-            x0=-b_mm*0.05, y0=h_mm - c_mm,
-            x1=b_mm*1.05, y1=h_mm - c_mm,
+            x0=-b_mm*0.05, y0=h_mm - c_mm, x1=b_mm*1.05, y1=h_mm - c_mm,
             line=dict(color="#27ae60", width=3, dash="dash"),
             row=1, col=1
         )
         
+        # Neutral axis label
         fig.add_annotation(
             x=b_mm * 1.12, y=h_mm - c_mm,
             text="<b>N.A.</b>",
@@ -84,24 +91,28 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
             if num == 1:
                 x_positions = [b_mm / 2]
             elif num == 2:
-                x_positions = [cover_mm + dia/2, b_mm - cover_mm - dia/2]
+                x_positions = [cover_mm + dia / 2, 
+                              b_mm - cover_mm - dia / 2]
             else:
-                spacing = (b_mm - 2*cover_mm - dia) / (num - 1)
-                x_positions = [cover_mm + dia/2 + i*spacing for i in range(num)]
+                # Evenly distribute bars
+                spacing = (b_mm - 2 * cover_mm - dia) / (num - 1)
+                x_positions = [cover_mm + dia / 2 + i * spacing 
+                              for i in range(num)]
             
+            # Draw each bar
             for x in x_positions:
                 fig.add_shape(
                     type="circle",
-                    x0=x - dia/2, y0=y - dia/2,
-                    x1=x + dia/2, y1=y + dia/2,
+                    x0=x - dia / 2, y0=y - dia / 2,
+                    x1=x + dia / 2, y1=y + dia / 2,
                     fillcolor="#8e44ad",
                     line=dict(color="#2c3e50", width=2),
                     row=1, col=1
                 )
     
-    # Dimension annotations
+    # Add dimension annotations
     fig.add_annotation(
-        x=b_mm/2, y=-h_mm*0.08,
+        x=b_mm / 2, y=-h_mm * 0.08,
         text=f"<b>b = {b_mm:.0f} mm</b>",
         showarrow=False,
         font=dict(size=12, color="#34495e"),
@@ -109,7 +120,7 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
     )
     
     fig.add_annotation(
-        x=-b_mm*0.15, y=h_mm/2,
+        x=-b_mm * 0.15, y=h_mm / 2,
         text=f"<b>h = {h_mm:.0f} mm</b>",
         showarrow=False,
         font=dict(size=12, color="#34495e"),
@@ -117,26 +128,29 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
         row=1, col=1
     )
     
-    # ==========================================
-    # RIGHT: STRAIN DIAGRAM
-    # ==========================================
+    # ===========================
+    # SUBPLOT 2: STRAIN DIAGRAM
+    # ===========================
     
     if strain_profile:
         epsilon_c = strain_profile['epsilon_c']
         c_mm = strain_profile['c_mm']
+        d_mm = strain_profile['d_mm']
         epsilon_t = strain_profile['epsilon_t']
         
-        # Strain at bottom
+        # Strain at bottom fiber
         epsilon_bottom = epsilon_c * (c_mm - h_mm) / c_mm
         
-        # Main strain profile line
+        # Strain profile line (from top to bottom)
+        strain_x = [epsilon_c, epsilon_bottom]
+        strain_y = [h_mm, 0]
+        
         fig.add_trace(
             go.Scatter(
-                x=[epsilon_c, epsilon_bottom],
-                y=[h_mm, 0],
+                x=strain_x, y=strain_y,
                 mode='lines',
                 line=dict(color='#3498db', width=4),
-                name='Strain',
+                name='Strain Profile',
                 showlegend=False
             ),
             row=1, col=2
@@ -170,7 +184,7 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
             row=1, col=2
         )
         
-        # Neutral axis
+        # Neutral axis line
         x_min = min(epsilon_bottom, 0) * 1.15
         x_max = epsilon_c * 1.15
         fig.add_shape(
@@ -181,20 +195,21 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
             row=1, col=2
         )
         
-        # Strain at bar locations
+        # Mark strains at bar locations
         for y_pos, eps in strain_profile['bar_strains']:
             fig.add_trace(
                 go.Scatter(
                     x=[eps], y=[y_pos],
                     mode='markers',
-                    marker=dict(size=10, color='#8e44ad', symbol='circle', line=dict(color='white', width=2)),
+                    marker=dict(size=10, color='#8e44ad', symbol='circle', 
+                               line=dict(color='white', width=2)),
                     showlegend=False,
-                    hovertemplate=f'<b>Bar Level</b><br>y = {y_pos:.0f} mm<br>ε = {eps:.5f}<extra></extra>'
+                    hovertemplate=f'<b>Bar Level</b><br>y={y_pos:.0f}mm<br>ε={eps:.5f}<extra></extra>'
                 ),
                 row=1, col=2
             )
         
-        # Strain value annotations
+        # Strain annotations
         fig.add_annotation(
             x=epsilon_c, y=h_mm,
             text=f"<b>εc = {epsilon_c:.4f}</b>",
@@ -217,7 +232,7 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
             row=1, col=2
         )
         
-        # Tension limit reference line
+        # ACI tension limit line
         fig.add_shape(
             type="line",
             x0=-0.005, y0=0, x1=-0.005, y1=h_mm,
@@ -226,25 +241,25 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
         )
         
         fig.add_annotation(
-            x=-0.005, y=h_mm*0.92,
+            x=-0.005, y=h_mm * 0.92,
             text="<b>εt = 0.005</b><br>(Tension limit)",
             showarrow=False,
             font=dict(size=10, color="#9b59b6"),
             row=1, col=2
         )
     
-    # Axis configuration
+    # Update axes
     fig.update_xaxes(
-        title_text="<b>Width (mm)</b>",
-        row=1, col=1,
-        range=[-b_mm*0.25, b_mm*1.3],
+        title_text="<b>Width (mm)</b>", 
+        row=1, col=1, 
+        range=[-b_mm * 0.25, b_mm * 1.3],
         showgrid=True,
         gridcolor='rgba(0,0,0,0.1)',
         gridwidth=1
     )
     
     fig.update_xaxes(
-        title_text="<b>Strain (ε)</b>",
+        title_text="<b>Strain (ε)</b>", 
         row=1, col=2,
         showgrid=True,
         gridcolor='rgba(0,0,0,0.1)',
@@ -254,17 +269,17 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
     )
     
     fig.update_yaxes(
-        title_text="<b>Height (mm)</b>",
-        row=1, col=1,
-        range=[-h_mm*0.15, h_mm*1.12],
+        title_text="<b>Height (mm)</b>", 
+        row=1, col=1, 
+        range=[-h_mm * 0.15, h_mm * 1.12],
         showgrid=True,
         gridcolor='rgba(0,0,0,0.1)'
     )
     
     fig.update_yaxes(
-        title_text="<b>Height (mm)</b>",
-        row=1, col=2,
-        range=[0, h_mm*1.05],
+        title_text="<b>Height (mm)</b>", 
+        row=1, col=2, 
+        range=[0, h_mm * 1.05],
         showgrid=True,
         gridcolor='rgba(0,0,0,0.1)'
     )
@@ -281,43 +296,37 @@ def draw_section_and_strain(b_mm, h_mm, cover_mm, bar_data, strain_profile):
     return fig
 
 
-def plot_section_comparison(results_list):
+def plot_three_section_comparison(results_data):
     """
-    Create bar chart comparing three sections
+    Create bar charts comparing capacities across three sections
     
-    Args:
-        results_list: List of result dictionaries
-        
+    Parameters:
+    -----------
+    results_data : list
+        List of dictionaries with section results
+    
     Returns:
-        plotly Figure object
+    --------
+    plotly.graph_objects.Figure
     """
     
-    sections = [r['Section'] for r in results_list]
-    moments = []
-    shears = []
-    
-    for r in results_list:
-        try:
-            moments.append(float(r['φMn (tonf·m)']))
-        except:
-            moments.append(0)
-        
-        try:
-            shears.append(float(r['φVn (tonf)']))
-        except:
-            shears.append(0)
+    sections = [r['Section'] for r in results_data]
+    moments = [float(r['φMn (tonf·m)']) if r['φMn (tonf·m)'] != 'Error' else 0 
+               for r in results_data]
+    shears = [float(r['φVn (tonf)']) if r['φVn (tonf)'] != 'Error' else 0 
+              for r in results_data]
     
     fig = make_subplots(
         rows=1, cols=2,
-        subplot_titles=('<b>Bending Capacity</b>', '<b>Shear Capacity</b>'),
+        subplot_titles=('<b>Bending Capacity Comparison</b>', '<b>Shear Capacity Comparison</b>'),
         horizontal_spacing=0.15
     )
     
-    # Moment bars
+    # Bending capacity bars
     fig.add_trace(
         go.Bar(
-            x=sections,
-            y=moments,
+            x=sections, 
+            y=moments, 
             name='φMn',
             marker=dict(
                 color='#3498db',
@@ -330,11 +339,11 @@ def plot_section_comparison(results_list):
         row=1, col=1
     )
     
-    # Shear bars
+    # Shear capacity bars
     fig.add_trace(
         go.Bar(
-            x=sections,
-            y=shears,
+            x=sections, 
+            y=shears, 
             name='φVn',
             marker=dict(
                 color='#e74c3c',
@@ -355,9 +364,9 @@ def plot_section_comparison(results_list):
     fig.update_layout(
         height=450,
         showlegend=False,
+        hovermode='x unified',
         plot_bgcolor='white',
-        font=dict(family="Arial", size=11),
-        hovermode='x unified'
+        font=dict(family="Arial", size=11)
     )
     
     return fig
