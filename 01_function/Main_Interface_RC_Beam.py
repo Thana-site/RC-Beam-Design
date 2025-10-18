@@ -1,7 +1,7 @@
 """
 RC Beam Design & Analysis - Main Interface
 ACI 318 Compliant Structural Analysis Tool
-GitHub Repository Structure
+Refactored Modular Architecture
 """
 
 import streamlit as st
@@ -33,11 +33,9 @@ from SubFunction.diagram_plot import (
 from SubFunction.material_config import MaterialConfig
 
 
-
-# ========================================
+# ================================
 # PAGE CONFIGURATION
-# ========================================
-
+# ================================
 st.set_page_config(
     page_title="RC Beam Analysis - ACI 318",
     page_icon="🏗️",
@@ -46,175 +44,163 @@ st.set_page_config(
 )
 
 
-# ========================================
-# APPLY STYLING
-# ========================================
+# ================================
+# APPLY CUSTOM STYLING
+# ================================
+apply_custom_css()
 
-apply_custom_styling()
 
-
-# ========================================
-# HEADER
-# ========================================
-
+# ================================
+# RENDER HEADER
+# ================================
 render_header()
 
 
-# ========================================
+# ================================
 # SIDEBAR CONFIGURATION
-# ========================================
+# ================================
+config = render_sidebar_config()
 
-config = render_sidebar_controls()
-
-# Extract configuration
 analysis_mode = config['analysis_mode']
 fc_ksc = config['fc_ksc']
-fy_main = config['fy_main']
-fy_stirrup = config['fy_stirrup']
-b_mm = config['b_mm']
-h_mm = config['h_mm']
-cover_mm = config['cover_mm']
+fy_main_ksc = config['fy_main_ksc']
+fy_stirrup_ksc = config['fy_stirrup_ksc']
 
 
-# ========================================
-# MAIN CONTENT
-# ========================================
+# ================================
+# MAIN CONTENT AREA
+# ================================
 
-# Display geometry summary
-st.markdown("### 📐 Section Configuration")
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("Width (b)", f"{b_mm:.0f} mm")
-with col2:
-    st.metric("Height (h)", f"{h_mm:.0f} mm")
-with col3:
-    st.metric("Cover", f"{cover_mm:.0f} mm")
-with col4:
-    st.metric("Concrete f'c", f"{fc_ksc:.0f} ksc")
+# Geometry inputs
+geometry = render_geometry_inputs()
+b_mm = geometry['b_mm']
+h_mm = geometry['h_mm']
+cover_mm = geometry['cover_mm']
 
 st.markdown("---")
 
 
-# ========================================
+# ================================
 # SINGLE SECTION MODE
-# ========================================
-
+# ================================
 if analysis_mode == "Single Section":
     
-    st.markdown("### 🔧 Reinforcement Configuration")
+    # Reinforcement input tables
+    st.markdown('<div class="input-section">', unsafe_allow_html=True)
     
-    # Input tables in two columns
-    st.markdown('<div class="input-card">', unsafe_allow_html=True)
     col_left, col_right = st.columns(2)
     
     with col_left:
-        bars_df = create_reinforcement_table()
+        bars_df = create_main_reinforcement_table()
     
     with col_right:
-        stirrup_df = create_stirrup_table(fy_stirrup)
+        stirrup_df = create_stirrup_table(fy_stirrup_ksc)
     
     st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
     # Analysis button
-    if st.button("🚀 **Analyze Section**", type="primary", use_container_width=True):
+    if st.button("🚀 Analyze Section", use_container_width=True, type="primary"):
         
-        with st.spinner("⚙️ Running structural analysis..."):
+        with st.spinner("🔄 Analyzing beam section..."):
             
-            # Flexural analysis
+            # Perform flexural analysis
             flex_results = analyze_flexural_capacity(
                 b_mm, h_mm, cover_mm,
                 bars_df,
-                fc_ksc, fy_main
+                fc_ksc, fy_main_ksc
             )
             
             if flex_results is None:
-                st.error("⚠️ Analysis failed. Check reinforcement input.")
+                st.error("⚠️ Unable to analyze section. Please check reinforcement input.")
             else:
-                # Store in session state
-                st.session_state['flex_results'] = flex_results
+                # Store results in session state
+                st.session_state.flex_results = flex_results
                 
-                # Shear analysis
+                # Perform shear analysis
                 shear_results = analyze_shear_capacity(
                     b_mm, h_mm,
                     flex_results['d_mm'],
                     fc_ksc,
                     stirrup_df
                 )
-                st.session_state['shear_results'] = shear_results
+                st.session_state.shear_results = shear_results
                 
                 st.success("✅ Analysis completed successfully!")
     
     # Display results if available
-    if 'flex_results' in st.session_state and st.session_state['flex_results']:
+    if 'flex_results' in st.session_state and st.session_state.flex_results:
         
-        flex_results = st.session_state['flex_results']
+        flex_results = st.session_state.flex_results
         
-        st.markdown('<div class="results-section">', unsafe_allow_html=True)
-        st.markdown("## 📊 Analysis Results")
+        st.markdown('<div class="results-container">', unsafe_allow_html=True)
+        st.markdown("### 📊 Analysis Results")
         
-        # Combined diagram (section + strain side-by-side)
-        fig = draw_section_and_strain(
+        # Create and display visualization
+        fig = plot_section_and_strain(
             b_mm, h_mm, cover_mm,
             flex_results['bar_data'],
             flex_results['strain_profile']
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # Failure mode badge
-        display_failure_mode(
+        # Display failure mode badge
+        display_failure_mode_badge(
             flex_results['control_type'],
             flex_results['phi'],
             flex_results['epsilon_t']
         )
         
-        # Capacity metrics
+        # Display capacity results
         if 'shear_results' in st.session_state:
-            display_capacity_metrics(
+            display_capacity_results(
                 flex_results,
-                st.session_state['shear_results']
+                st.session_state.shear_results
             )
         
-        # Detailed parameters
-        display_detailed_results(flex_results)
+        # Display detailed parameters
+        display_detailed_parameters(flex_results)
         
         st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ========================================
+# ================================
 # THREE-SECTION MODE
-# ========================================
-
+# ================================
 else:
     
-    st.markdown("## 🔀 Three-Section Analysis")
-    st.info("📌 Configure reinforcement for Start, Mid, and End sections")
+    st.markdown("### 🔀 Three-Section Analysis (Start - Mid - End)")
+    st.info("📌 Define reinforcement for each section separately.")
     
     # Create tabs for each section
     tab1, tab2, tab3 = st.tabs(["📍 Start Section", "📍 Mid Section", "📍 End Section"])
     
-    for tab, section_name in zip([tab1, tab2, tab3], ["Start", "Mid", "End"]):
+    for idx, (tab, section_name) in enumerate(
+        zip([tab1, tab2, tab3], ["Start", "Mid", "End"])
+    ):
         with tab:
-            st.markdown(f"#### {section_name} Section Configuration")
+            st.markdown(f"#### Configuration for {section_name} Section")
             
-            st.markdown('<div class="input-card">', unsafe_allow_html=True)
+            st.markdown('<div class="input-section">', unsafe_allow_html=True)
             col_left, col_right = st.columns(2)
             
             with col_left:
-                bars_df = create_reinforcement_table(f"_{section_name.lower()}")
+                bars_df = create_main_reinforcement_table(f"_{section_name.lower()}")
             
             with col_right:
-                stirrup_df = create_stirrup_table(fy_stirrup, f"_{section_name.lower()}")
-            
+                stirrup_df = create_stirrup_table(
+                    fy_stirrup_ksc,
+                    f"_{section_name.lower()}"
+                )
             st.markdown('</div>', unsafe_allow_html=True)
     
     st.markdown("---")
     
-    # Analyze all sections
-    if st.button("🚀 **Analyze All Sections**", type="primary", use_container_width=True):
+    # Analyze all sections button
+    if st.button("🚀 Analyze All Sections", use_container_width=True, type="primary"):
         
-        with st.spinner("⚙️ Analyzing all three sections..."):
+        with st.spinner("🔄 Analyzing all three sections..."):
             
             results_summary = []
             
@@ -226,7 +212,7 @@ else:
                 flex_results = analyze_flexural_capacity(
                     b_mm, h_mm, cover_mm,
                     st.session_state[bars_key],
-                    fc_ksc, fy_main
+                    fc_ksc, fy_main_ksc
                 )
                 
                 if flex_results:
@@ -256,16 +242,16 @@ else:
                         'εt': 'N/A'
                     })
             
-            st.session_state['three_section_results'] = results_summary
+            st.session_state.three_section_results = results_summary
             st.success("✅ Three-section analysis completed!")
     
-    # Display results
+    # Display three-section results
     if 'three_section_results' in st.session_state:
         
-        st.markdown('<div class="results-section">', unsafe_allow_html=True)
-        st.markdown("## 📊 Comparative Results")
+        st.markdown('<div class="results-container">', unsafe_allow_html=True)
+        st.markdown("### 📊 Three-Section Analysis Summary")
         
-        results_df = pd.DataFrame(st.session_state['three_section_results'])
+        results_df = pd.DataFrame(st.session_state.three_section_results)
         
         st.dataframe(
             results_df,
@@ -273,9 +259,12 @@ else:
             use_container_width=True
         )
         
-        # Visual comparison
-        st.markdown("#### 📈 Capacity Comparison Chart")
-        fig_compare = plot_section_comparison(st.session_state['three_section_results'])
+        # Visual comparison chart
+        st.markdown("#### 📈 Capacity Comparison")
+        
+        fig_compare = plot_three_section_comparison(
+            st.session_state.three_section_results
+        )
         st.plotly_chart(fig_compare, use_container_width=True)
         
         # Export options
@@ -284,7 +273,7 @@ else:
         with col1:
             csv = results_df.to_csv(index=False)
             st.download_button(
-                label="📥 Download CSV",
+                label="📥 Download Results (CSV)",
                 data=csv,
                 file_name="rc_beam_3section_analysis.csv",
                 mime="text/csv",
@@ -292,25 +281,26 @@ else:
             )
         
         with col2:
-            summary_text = f"""RC BEAM THREE-SECTION ANALYSIS
-{'='*70}
-Geometry: {b_mm} × {h_mm} mm
+            # Text summary
+            summary = f"""RC BEAM THREE-SECTION ANALYSIS
+{'='*60}
+Beam Geometry: {b_mm} × {h_mm} mm
 Concrete: f'c = {fc_ksc} ksc
-Steel: fy = {fy_main} ksc
+Steel: fy = {fy_main_ksc} ksc
 
-RESULTS:
-{'='*70}
+RESULTS SUMMARY:
+{'='*60}
 """
-            for r in st.session_state['three_section_results']:
-                summary_text += f"\n{r['Section']} Section:\n"
-                summary_text += f"  φMn = {r['φMn (tonf·m)']} tonf·m\n"
-                summary_text += f"  φVn = {r['φVn (tonf)']} tonf\n"
-                summary_text += f"  Mode = {r['Control Type']}\n"
+            for r in st.session_state.three_section_results:
+                summary += f"\n{r['Section']} Section:\n"
+                summary += f"  Bending: φMn = {r['φMn (tonf·m)']} tonf·m\n"
+                summary += f"  Shear: φVn = {r['φVn (tonf)']} tonf\n"
+                summary += f"  Mode: {r['Control Type']}\n"
             
             st.download_button(
-                label="📄 Download Report",
-                data=summary_text,
-                file_name="rc_beam_3section_report.txt",
+                label="📄 Download Summary (TXT)",
+                data=summary,
+                file_name="rc_beam_3section_summary.txt",
                 mime="text/plain",
                 use_container_width=True
             )
@@ -318,47 +308,20 @@ RESULTS:
         st.markdown('</div>', unsafe_allow_html=True)
 
 
-# ========================================
-# FOOTER
-# ========================================
-
+# ================================
+# FOOTER & DOCUMENTATION
+# ================================
 render_footer()
 
-
-# ========================================
-# INFO SECTION
-# ========================================
-
-with st.expander("ℹ️ About This Application"):
-    st.markdown("""
-    ### RC Beam Design & Analysis Tool
-    
-    **Design Standard:** ACI 318-19 (Building Code Requirements for Structural Concrete)
-    
-    **Features:**
-    - ✅ Flexural capacity analysis (rectangular stress block method)
-    - ✅ Shear capacity calculation
-    - ✅ Strain distribution visualization
-    - ✅ Failure mode identification (tension/transition/compression control)
-    - ✅ Single section or three-section analysis
-    - ✅ Interactive reinforcement configuration
-    - ✅ Export results (CSV & text format)
-    
-    **Units:**
-    - Dimensions: millimeters (mm)
-    - Moments: tonf·m (metric ton-force × meter)
-    - Stresses: ksc (kg/cm²)
-    - Forces: tonf (metric ton-force)
-    
-    **Limitations:**
-    - Rectangular sections only
-    - Singly reinforced beams
-    - Serviceability checks not included
-    - Development length must be verified separately
-    
-    **Version:** 2.0.0 (Refactored Modular Architecture)
-    
-    ---
-    
-    *For educational and preliminary design purposes. Always verify with licensed professional engineer.*
-    """)
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center; color: #64748b; padding: 1rem;'>
+    <p><strong>🏗️ RC Beam Design & Analysis v2.0</strong> | ACI 318 Compliant</p>
+    <p style='font-size: 0.9em;'>
+        <em>Refactored Modular Architecture | Professional Structural Analysis Tool</em>
+    </p>
+    <p style='font-size: 0.85rem; margin-top: 0.5rem;'>
+        For educational and preliminary design purposes • Always verify with licensed engineer
+    </p>
+</div>
+""", unsafe_allow_html=True)
