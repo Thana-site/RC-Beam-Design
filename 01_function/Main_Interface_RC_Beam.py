@@ -6,6 +6,13 @@ Refactored Modular Architecture
 
 import streamlit as st
 import pandas as pd
+import sys
+from pathlib import Path
+
+# Add the current directory to Python path for imports
+current_dir = Path(__file__).parent
+if str(current_dir) not in sys.path:
+    sys.path.insert(0, str(current_dir))
 
 # Import sub-function modules
 from SubFunction.ui_layout import (
